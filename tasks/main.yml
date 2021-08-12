@@ -1,0 +1,90 @@
+- name: debug
+  debug:
+    msg: jeste kubernetese simple
+
+- include_tasks: install.yml
+- include_tasks: selinux_policies.yml
+- include_tasks: look_for_masters.yml 
+- block:
+    - include_tasks: start_existing.yml
+
+    - include_tasks: start_one.yml
+      when: not _kube_masters
+    - include_tasks: look_for_masters.yml 
+    - name: assert that cluster is running (have nodes with tokens)
+      assert:
+        that:
+          - _kube_masters|length > 0
+    - name: read existing token
+      command: "cat /var/lib/rancher/rke2/server/node-token"
+      check_mode: false
+      changed_when: false
+      run_once: true
+      register: _node_token
+      delegate_to: "{{ _kube_masters[0] }}"
+
+    - name: copy config
+      template:
+        src: config.yml
+        dest: /etc/rancher/rke2/config.yaml
+      notify:
+        - restart rke2-server
+    - name: create drop-in directory
+      file:
+        state: directory
+        path: /etc/systemd/system/rke2-server.service.d
+    - name: copy drop-in
+      template:
+        src: drop-in
+        dest: /etc/systemd/system/rke2-server.service.d/retry.conf
+
+    - name: start rke-server
+      systemd:
+        name: rke2-server
+        state: started
+        enabled: true
+        daemon_reload: true
+      register: _result
+      retries: 300
+      delay: 5
+      until: _result is not failed
+
+    - include_tasks: wait_for_node_kubectl.yml
+      vars:
+        _delegate_node: "{{ inventory_hostname }}"
+
+  become: true
+  become_user: root
+  when: inventory_hostname in groups['kubernetes_master']
+
+- block:
+    - name: read existing token
+      command: "cat /var/lib/rancher/rke2/server/node-token"
+      check_mode: false
+      changed_when: false
+      run_once: true
+      register: _node_token
+      delegate_to: "{{ _kube_masters[0] }}"
+    - name: copy config
+      template:
+        src: config.yml
+        dest: /etc/rancher/rke2/config.yaml
+      notify:
+        - restart rke2-agent
+
+    - name: start rke-agent
+      systemd:
+        name: rke2-agent
+        state: started
+        enabled: true
+        daemon_reload: true
+      register: _result
+      retries: 300
+      delay: 5
+      until: _result is not failed
+
+    - include_tasks: wait_for_node_kubectl.yml
+  become: true
+  become_user: root
+  when: inventory_hostname in groups['kubernetes_worker']
+

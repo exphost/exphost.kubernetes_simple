@@ -1,0 +1,21 @@
+---
+- block:
+    - name: copy config
+      template:
+        src: config.yml
+        dest: /etc/rancher/rke2/config.yaml
+      notify:
+        - restart rke2-server
+
+    - name: start rke-server
+      service:
+        name: rke2-server
+        state: started
+        enabled: true
+    - include_tasks: wait_for_node_kubectl.yml
+      vars:
+        _delegate_node: "{{ inventory_hostname }}"
+  become: true
+  become_user: root
+  run_once: true
+

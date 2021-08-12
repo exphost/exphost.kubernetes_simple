@@ -1,0 +1,24 @@
+- block:
+    - name: look for node-token # this is done on every host, not run one
+      stat:
+        path: /var/lib/rancher/rke2/server/node-token
+      register: _node_token_stat
+    - block:
+        - name: start existing cluster
+          service:
+            name: rke2-server
+            state: started
+    
+        - include_tasks: wait_for_node_kubectl.yml
+          vars:
+            _delegate_node: "{{ inventory_hostname }}"
+    
+        - name: set flag about existing cluster
+          set_fact:
+            _kubernetes_cluster_exists: true
+          run_once: true
+    
+      when: _node_token_stat.stat.exists
+  become: True
+  become_user: root
+

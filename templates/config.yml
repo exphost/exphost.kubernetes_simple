@@ -1,0 +1,25 @@
+---
+{% if _kube_masters %}
+server: https://{{ hostvars[_kube_masters[0]]['ansible_default_ipv4']['address'] }}:9345
+token: {{ _node_token.stdout }}
+{% endif %}
+{% if inventory_hostname in groups['kubernetes_master'] %}
+kube-scheduler-arg:
+  - bind-address=0.0.0.0
+  - address=0.0.0.0
+kube-controller-manager-arg:
+  - bind-address=0.0.0.0
+  - address=0.0.0.0
+{%   if oidc.enabled|default(true) %}
+kube-apiserver-arg:
+  - oidc-issuer-url={{ oidc.issuer_url }}
+  - oidc-client-id=kubernetes
+  - oidc-username-claim=name
+  - "oidc-username-prefix=oidc:"
+  - "oidc-groups-prefix=oidc:"
+  - oidc-groups-claim=groups
+{%   endif %}
+{% endif %}
+kubelet-arg:
+  - system-reserved=cpu=100m,memory=500Mi
+  - kube-reserved=cpu=100m,memory=500Mi

@@ -1,0 +1,22 @@
+---
+- block:
+    - include_tasks: wait_for_node_kubectl.yml
+      vars:
+        _ignore_errors: true
+    - block:
+        - name: restart rke-server
+          service:
+            name: rke2-server
+            state: restarted
+          when: inventory_hostname in groups['kubernetes_master']
+
+        - name: restart rke-agent
+          service:
+            name: rke2-agent
+            state: restarted
+          when: inventory_hostname in groups['kubernetes_worker']
+
+        - include_tasks: wait_for_node_kubectl.yml
+      when: _get_nodes.failed|default(false)
+  become: true
+  become_user: root

@@ -1,0 +1,16 @@
+- block:
+    - name: look for node-token
+      stat:
+        path: /var/lib/rancher/rke2/server/node-token
+      register: _node_token_stat
+      delegate_to: "{{ _delegate_host }}"
+      loop: "{{ groups['kubernetes_master'] }}"
+      loop_control:
+        loop_var: _delegate_host
+
+    - name: set_masters
+      set_fact:
+        _kube_masters: "{{ _node_token_stat|json_query('results[?stat.exists]._delegate_host')|default([])|sort }}"
+  run_once: true
+  become: true
+  become_user: root

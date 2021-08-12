@@ -1,0 +1,11 @@
+- name: wait for node to be ready
+  vars:
+    _kubectl: "/var/lib/rancher/rke2/bin/kubectl --kubeconfig /etc/rancher/rke2/rke2.yaml"
+  shell: "{{ _kubectl }} get nodes {{ ansible_fqdn }}|cat"
+  changed_when: false
+  ignore_errors: "{{ _ignore_errors|default(false) }}"
+  register: _get_nodes
+  check_mode: false
+  until: '" Ready" in _get_nodes.stdout|default("")'
+  retries: 120
+  delegate_to: "{{ _delegate_node | default( _kube_masters[0]) }}"
